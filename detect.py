@@ -1,9 +1,16 @@
+#-- coding: utf-8 --
 import os
+import sys
+sys.path.append('/data1/zl9/mtimg/yolov3-mxnet/core')
 import time
 import argparse
 from utils import *
 from darknet import DarkNet, TinyDarkNet
-
+import pdb
+import colorsys
+from createXml import create
+from PIL import Image, ImageFont, ImageDraw
+import mxnet as mx
 image_name = 0
 
 
@@ -11,7 +18,7 @@ def arg_parse():
     parser = argparse.ArgumentParser(description="YOLO v3 Detection Module")
     parser.add_argument("--images", dest='images', help=
     "Image / Directory containing images to perform detection upon",
-                        default="images", type=str)
+                        default="/data1/zl9/mtimg/data/test/jt/", type=str)
     parser.add_argument("--video", dest='video', help=
     "video file path", type=str)
     parser.add_argument("--classes", dest="classes", default="data/coco.names", type=str)
@@ -20,8 +27,8 @@ def arg_parse():
     "Image / Directory to store detections to", default="results", type=str)
     parser.add_argument("--batch_size", dest="batch_size", help="Batch size", default=16, type=int)
     parser.add_argument("--tiny", dest="tiny", help="use yolov3-tiny", default=False, type=bool)
-    parser.add_argument("--confidence", dest="confidence", help="Object Confidence", default=0.5, type=float)
-    parser.add_argument("--nms_thresh", dest="nms_thresh", help="NMS Threshhold", default=0.4, type=float)
+    parser.add_argument("--confidence", dest="confidence", help="Object Confidence", default=0.50, type=float)
+    parser.add_argument("--nms_thresh", dest="nms_thresh", help="NMS Threshhold", default=0.20, type=float)
     parser.add_argument("--params", dest='params', help=
     "params file", default="models/yolov3.weights", type=str)
     parser.add_argument("--input_dim", dest='input_dim', help=
@@ -64,22 +71,32 @@ def parse_cfg(cfgfile):
 
 
 def draw_bbox(img, bboxs):
-    for x in bboxs:
-        c1 = tuple(x[1:3].astype("int"))
-        c2 = tuple(x[3:5].astype("int"))
-        cls = int(x[-1])
-        # color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-        color = (255, 0, 0)
-        label = "{0} {1:.3f}".format(classes[cls], x[-2])
-        cv2.rectangle(img, c1, c2, color, 2)
-        t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1, 1)[0]
-        c2 = c1[0] + t_size[0] + 2, c1[1] - t_size[1] - 5
-        cv2.rectangle(img, c1, c2, color, -1)
-        cv2.putText(img, label, (c1[0], c1[1] - t_size[1] + 7), cv2.FONT_HERSHEY_PLAIN, 1, [225, 255, 255], 1)
-    return img
+   for x in bboxs:
+	cls = int(x[-1])
+	predicted_class = classes[cls]  # 类别
+    	box = x[1:5]  # 框
+    	score = x[-2]  # 执行度
 
+    	label = '{} {:.2f}'.format(predicted_class, score)  # 标签
 
-def save_results(load_images, output, input_dim):
+	top, left, bottom, right = box
+	top = max(0, np.floor(top + 0.5).astype('int32'))
+    	left = max(0, np.floor(left + 0.5).astype('int32'))
+    	bottom = min(img.shape[1], np.floor(bottom + 0.5).astype('int32'))
+    	right = min(img.shape[0], np.floor(right + 0.5).astype('int32'))
+
+	c1 = (top,left)
+	c2 = (bottom,right)
+	cv2.rectangle(img,c1, c2,colors[cls],4)
+        t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 2, 2)[0]
+        c2 = c1[0] + t_size[0] + 20, c1[1] - t_size[1] - 20
+        cv2.rectangle(img, c1, c2, colors[cls], -1)
+        cv2.putText(img, label, (c1[0], c1[1] - t_size[1] + 5), cv2.FONT_HERSHEY_PLAIN, 2, [0, 0, 0], 1)
+   
+   return img
+
+def save_results(load_images, images_name,output, input_dim):
+
     im_dim_list = nd.array([(x.shape[1], x.shape[0]) for x in load_images])
     im_dim_list = nd.tile(im_dim_list, 2)
     im_dim_list = im_dim_list[output[:, 0], :]
@@ -96,14 +113,20 @@ def save_results(load_images, output, input_dim):
         output[i, [2, 4]] = nd.clip(output[i, [2, 4]], a_min=0.0, a_max=im_dim_list[i][1].asscalar())
 
     output = output.asnumpy()
+    
+
     for i in range(len(load_images)):
         bboxs = []
         for bbox in output:
             if i == int(bbox[0]):
                 bboxs.append(bbox)
         draw_bbox(load_images[i], bboxs)
+    	xml_path = '/data1/zl9/mtimg/data/xml/dw_xmlm/'
+    	img_shape = [load_images[i].shape[1],load_images[i].shape[0],3]
+    	create(xml_path,images_name[i],img_shape,bboxs,classes)
+
     global image_name
-    list(map(cv2.imwrite, [os.path.join(dst_dir, "{0}.jpg".format(image_name + i)) for i in range(len(load_images))], load_images))
+    list(map(cv2.imwrite, [os.path.join(dst_dir, "{0}.jpg".format(images_name[i])) for i in range(len(load_images))], load_images))
     image_name += len(load_images)
 
 
@@ -174,6 +197,8 @@ def predict_video(net, ctx, video_file, anchors):
 
 
 if __name__ == '__main__':
+
+    np.set_printoptions(suppress=True)
     args = arg_parse()
     images = args.images
     batch_size = args.batch_size
@@ -186,6 +211,7 @@ if __name__ == '__main__':
 
     gpu = [int(x) for x in args.gpu.replace(" ", "").split(",")]
     ctx = try_gpu(args.gpu)[0]
+    #ctx = mx.cpu()
     num_classes = len(classes)
     if args.tiny:
         net = TinyDarkNet(input_dim=input_dim, num_classes=num_classes)
@@ -226,6 +252,7 @@ if __name__ == '__main__':
     if not imlist:
         print("no images to detect")
         exit()
+    print(len(imlist))
     leftover = 0
     if len(imlist) % batch_size:
         leftover = 1
@@ -236,8 +263,15 @@ if __name__ == '__main__':
 
     start_det_loop = time.time()
 
+    global colors
+
+    hsv_tuples = [(float(x) / num_classes, 1., 1.)  for x in range(num_classes)]  # 不同颜色
+    colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
+    colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))  # RGB
+
     output = None
     for i, batch in enumerate(im_batches):
+	images_name = [img.split('/')[-1] for img in batch]
         load_images = [cv2.imread(img) for img in batch]
         tmp_batch = list(map(prep_image, load_images, [input_dim for x in range(len(batch))]))
         tmp_batch = nd.array(tmp_batch, ctx=ctx)
@@ -256,7 +290,7 @@ if __name__ == '__main__':
         print("----------------------------------------------------------")
 
         if output is not None:
-            save_results(load_images, output, input_dim=input_dim)
+            save_results(load_images, images_name,output, input_dim=input_dim)
         else:
             print("No detections were made")
         output = None
