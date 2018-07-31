@@ -1,7 +1,7 @@
 #-- coding: utf-8 --
 import os
 import sys
-sys.path.append('/data1/zl9/mtimg/yolov3-mxnet/core')
+sys.path.append('./core')
 import time
 import argparse
 from utils import *
