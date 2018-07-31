@@ -18,7 +18,7 @@ def arg_parse():
     parser = argparse.ArgumentParser(description="YOLO v3 Detection Module")
     parser.add_argument("--images", dest='images', help=
     "Image / Directory containing images to perform detection upon",
-                        default="/data1/zl9/mtimg/data/test/jt/", type=str)
+                        default="", type=str)
     parser.add_argument("--video", dest='video', help=
     "video file path", type=str)
     parser.add_argument("--classes", dest="classes", default="data/coco.names", type=str)
