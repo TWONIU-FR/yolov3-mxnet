@@ -121,7 +121,7 @@ def save_results(load_images, images_name,output, input_dim):
             if i == int(bbox[0]):
                 bboxs.append(bbox)
         draw_bbox(load_images[i], bboxs)
-    	xml_path = '/data1/zl9/mtimg/data/xml/dw_xmlm/'
+    	xml_path = '/'
     	img_shape = [load_images[i].shape[1],load_images[i].shape[0],3]
     	create(xml_path,images_name[i],img_shape,bboxs,classes)
 
