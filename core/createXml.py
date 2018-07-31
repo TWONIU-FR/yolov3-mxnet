@@ -66,7 +66,7 @@ def create(xmlpath,img_name,imgShape,box_list,classes):
 	filename.appendChild(doc.createTextNode(img_name))
 	annotation.appendChild(filename)
 	
-	path_zl='/data1/zl9/mtimg/data/result_jiaotong/'+img_name
+	path_zl='/data1/zl9/data/result_jiaotong/'+img_name
 	path  = doc.createElement('path')
 	path.appendChild(doc.createTextNode(path_zl))
 	annotation.appendChild(path)
